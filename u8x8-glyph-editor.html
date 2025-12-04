@@ -373,16 +373,7 @@
                         select(i, j, fill);
                     }
                 }
-
-                if (undoElements.length > 0) {
-                    const last = undoElements[undoElements.length - 1];
-                    if (JSON.stringify(last) !== JSON.stringify(undoElement)) {
-                        undoElements.push(undoElement);
-                    }
-                } else {
-                    undoElements.push(undoElement);
-                }
-                updateUndo();
+                pushUndo(undoElement);
                 calcIcon();
             }
 
@@ -469,25 +460,44 @@
                 }
             }
 
-            const moveIcon = (dir) => {
+            const getMatrixValue = (x, y) => {
                 const matrix = displayMatrix;
-                const transformed = createMatrix();
-                const getValue = (x, y) => {
-                    if (x < matrix.length && x > -1) {
-                        if (y < matrix[x].length && y > -1) {
-                            return matrix[x][y];
-                        }
-                    }
-                    return false;
-                };
-
-                for (let x = 0; x < fontSizeX; x++) {
-                    for (let y = 0; y < fontSizeY; y++) {
-                        transformed[x][y] = getValue(x - dir.x, y - dir.y);
+                if (x < matrix.length && x > -1) {
+                    if (y < matrix[x].length && y > -1) {
+                        return matrix[x][y];
                     }
                 }
+                return false;
+            };
+
+            const moveIcon = (dir) => {
+                const transformed = createMatrix();
+                const undoElement = [];
+                for (let x = 0; x < fontSizeX; x++) {
+                    for (let y = 0; y < fontSizeY; y++) {
+                        transformed[x][y] = getMatrixValue(x - dir.x, y - dir.y);
+                        undoElement.push({x: x, y: y, value: getMatrixValue(x, y)})
+                    }
+                }
+                pushUndo(undoElement);
                 setMatrix(transformed);
                 calcIcon();
+            };
+
+            const pushUndo = (undoElement) => {
+                if(undoElement.length === 0) return;
+                if (undoElements.length > 0) {
+                    const last = undoElements[undoElements.length - 1];
+                    if (JSON.stringify(last) !== JSON.stringify(undoElement)) {
+                        undoElements.push(undoElement);
+                    }
+                } else {
+                    undoElements.push(undoElement);
+                }
+                //if(undoElements.length > 50) {
+                //    undoElements.splice(0, 1);
+                //}
+                updateUndo();
             };
 
             const updateUndo = () => {
@@ -500,6 +510,7 @@
                     select(e.x, e.y, e.value);
                 })
                 updateUndo();
+                calcIcon();
             }
 
             $(".undo i").click(undo);
@@ -528,11 +539,14 @@
             })
 
             $("#clear").click(() => {
+                const undoElement = [];
                 for (let x = 0; x < fontSizeX; x++) {
                     for (let y = 0; y < fontSizeY; y++) {
-                        select(x, y, false)
+                        undoElement.push({x, y, value: getMatrixValue(x, y)});
+                        select(x, y, false);
                     }
                 }
+                pushUndo(undoElement);
                 calcIcon();
             })
 
@@ -615,7 +629,7 @@
                             }
                         }
                     }
-                    undoElements.push(undo);
+                    pushUndo(undo);
                     undoStateBefore = null;
                 }
                 undoStartIdx = null;
